@@ -3,7 +3,9 @@ from rest_framework import viewsets
 from companies.models import Company, Employee, Project
 from companies.serializers import (
     CompanySerializer,
+    EmployeeDetailSerializer,
     EmployeeSerializer,
+    ProjectDetailSerializer,
     ProjectSerializer,
 )
 
@@ -18,12 +20,17 @@ class CompanyViewSet(viewsets.ModelViewSet):
 
 
 class EmployeeViewSet(viewsets.ModelViewSet):
-    queryset = Employee.objects.select_related("company")
+    queryset = Employee.objects.select_related("company").prefetch_related("projects")
     serializer_class = EmployeeSerializer
     filterset_fields = ("company",)
     search_fields = ("first_name", "last_name", "email")
     ordering_fields = ("last_name", "created_at")
     ordering = ("last_name", "first_name", "id")
+
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return EmployeeDetailSerializer
+        return EmployeeSerializer
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
@@ -33,3 +40,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
     search_fields = ("name",)
     ordering_fields = ("name", "created_at")
     ordering = ("-created_at", "id")
+
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return ProjectDetailSerializer
+        return ProjectSerializer
