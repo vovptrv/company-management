@@ -1,4 +1,6 @@
+import AddIcon from "@mui/icons-material/Add";
 import {
+  Button,
   Link,
   MenuItem,
   Paper,
@@ -11,19 +13,26 @@ import {
   TableRow,
   TextField,
 } from "@mui/material";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link as RouterLink } from "react-router";
 
 import { PROJECT_STATUS_CHOICES } from "../api/choices";
 import { PAGE_SIZE } from "../api/client";
-import { projectListQuery } from "../api/projects";
+import { deleteProject, projectListQuery } from "../api/projects";
+import { invalidateResources } from "../api/queryClient";
+import type { Project } from "../api/types";
+import { useAuth } from "../auth/AuthContext";
 import CompanyFilter from "../components/CompanyFilter";
+import ConfirmDeleteDialog from "../components/ConfirmDeleteDialog";
 import ErrorState from "../components/ErrorState";
 import ListPagination from "../components/ListPagination";
 import Loading from "../components/Loading";
 import PageHeader from "../components/PageHeader";
+import ProjectFormDialog from "../components/ProjectFormDialog";
+import RowActions from "../components/RowActions";
 import SearchField from "../components/SearchField";
 import StatusChip from "../components/StatusChip";
+import { useCrudDialogs } from "../hooks/useCrudDialogs";
 import { useListParams } from "../hooks/useListParams";
 import { formatDate } from "../utils/format";
 
@@ -31,6 +40,9 @@ export default function ProjectsPage() {
   const { page, search, getParam, setParam, setPage } = useListParams();
   const company = getParam("company");
   const status = getParam("status");
+  const { user } = useAuth();
+  const { form, pendingDelete, openCreate, openEdit, closeForm, askDelete, cancelDelete } =
+    useCrudDialogs<Project>();
 
   const { data, isPending, error } = useQuery(
     projectListQuery({
@@ -42,9 +54,27 @@ export default function ProjectsPage() {
     }),
   );
 
+  const remove = useMutation({
+    mutationFn: deleteProject,
+    onSuccess: () => {
+      invalidateResources();
+      cancelDelete();
+    },
+  });
+
   return (
     <>
-      <PageHeader title="Projects" subtitle={data && `${data.count} total`} />
+      <PageHeader
+        title="Projects"
+        subtitle={data && `${data.count} total`}
+        action={
+          user && (
+            <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
+              New project
+            </Button>
+          )
+        }
+      />
 
       <Stack direction="row" spacing={2} sx={{ mb: 3, flexWrap: "wrap" }}>
         <SearchField
@@ -85,6 +115,7 @@ export default function ProjectsPage() {
                   <TableCell>Start</TableCell>
                   <TableCell>End</TableCell>
                   <TableCell align="right">Team</TableCell>
+                  {user && <TableCell />}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -106,11 +137,20 @@ export default function ProjectsPage() {
                     <TableCell>{formatDate(project.start_date)}</TableCell>
                     <TableCell>{formatDate(project.end_date)}</TableCell>
                     <TableCell align="right">{project.employees.length}</TableCell>
+                    {user && (
+                      <TableCell align="right" sx={{ py: 0 }}>
+                        <RowActions
+                          label={project.name}
+                          onEdit={() => openEdit(project)}
+                          onDelete={() => askDelete(project)}
+                        />
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
                 {data.results.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={user ? 7 : 6} align="center" sx={{ py: 4 }}>
                       No projects match the current filters.
                     </TableCell>
                   </TableRow>
@@ -126,6 +166,19 @@ export default function ProjectsPage() {
             onChange={setPage}
           />
         </>
+      )}
+
+      {form && <ProjectFormDialog project={form.entity} onClose={closeForm} />}
+
+      {pendingDelete && (
+        <ConfirmDeleteDialog
+          title="Delete project?"
+          description={`${pendingDelete.name} will be removed. Its employees stay in the company.`}
+          error={remove.error}
+          isPending={remove.isPending}
+          onCancel={cancelDelete}
+          onConfirm={() => remove.mutate(pendingDelete.id)}
+        />
       )}
     </>
   );

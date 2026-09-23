@@ -62,6 +62,32 @@ export type ProjectEmployee = Pick<Employee, "id" | "first_name" | "last_name" |
 export type EmployeeDetail = Omit<Employee, "projects"> & { projects: EmployeeProject[] };
 export type ProjectDetail = Omit<Project, "employees"> & { employees: ProjectEmployee[] };
 
+export type CompanyInput = {
+  name: string;
+  description: string;
+  industry: Industry | "";
+  email: string;
+  website: string;
+};
+
+export type EmployeeInput = {
+  company: number | "";
+  first_name: string;
+  last_name: string;
+  email: string;
+  position: string;
+  hire_date: string | null;
+};
+
+export type ProjectInput = {
+  company: number | "";
+  name: string;
+  description: string;
+  status: ProjectStatus;
+  start_date: string | null;
+  end_date: string | null;
+};
+
 export type ListParams = {
   page?: number;
   page_size?: number;

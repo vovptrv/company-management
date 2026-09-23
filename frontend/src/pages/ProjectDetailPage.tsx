@@ -1,30 +1,39 @@
-import {
-  Link,
-  Paper,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
-} from "@mui/material";
-import { useQuery } from "@tanstack/react-query";
-import { Link as RouterLink, useParams } from "react-router";
+import { Link, Paper, Stack, Typography } from "@mui/material";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Link as RouterLink, useNavigate, useParams } from "react-router";
 
-import { projectQuery } from "../api/projects";
+import { deleteProject, projectQuery } from "../api/projects";
+import { invalidateResources } from "../api/queryClient";
+import type { ProjectDetail } from "../api/types";
+import { useAuth } from "../auth/AuthContext";
+import ConfirmDeleteDialog from "../components/ConfirmDeleteDialog";
+import DetailActions from "../components/DetailActions";
 import ErrorState from "../components/ErrorState";
 import Field from "../components/Field";
 import Loading from "../components/Loading";
 import PageHeader from "../components/PageHeader";
+import ProjectFormDialog from "../components/ProjectFormDialog";
+import ProjectTeam from "../components/ProjectTeam";
 import StatusChip from "../components/StatusChip";
-import { formatDate, fullName } from "../utils/format";
+import { useCrudDialogs } from "../hooks/useCrudDialogs";
+import { formatDate } from "../utils/format";
 
 export default function ProjectDetailPage() {
   const projectId = Number(useParams().projectId);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { form, pendingDelete, openEdit, closeForm, askDelete, cancelDelete } =
+    useCrudDialogs<ProjectDetail>();
 
   const { data: project, isPending, error } = useQuery(projectQuery(projectId));
+
+  const remove = useMutation({
+    mutationFn: deleteProject,
+    onSuccess: () => {
+      navigate("/projects", { replace: true });
+      invalidateResources();
+    },
+  });
 
   if (isPending) {
     return <Loading />;
@@ -35,7 +44,17 @@ export default function ProjectDetailPage() {
 
   return (
     <>
-      <PageHeader title={project.name} />
+      <PageHeader
+        title={project.name}
+        action={
+          user && (
+            <DetailActions
+              onEdit={() => openEdit(project)}
+              onDelete={() => askDelete(project)}
+            />
+          )
+        }
+      />
 
       <Paper sx={{ p: 3, mb: 3 }}>
         <Stack spacing={2}>
@@ -55,39 +74,20 @@ export default function ProjectDetailPage() {
         </Stack>
       </Paper>
 
-      <Typography variant="h6" sx={{ mb: 1.5 }}>
-        Team ({project.employees.length})
-      </Typography>
+      <ProjectTeam project={project} />
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Position</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {project.employees.map((employee) => (
-              <TableRow key={employee.id} hover>
-                <TableCell>
-                  <Link component={RouterLink} to={`/employees/${employee.id}`}>
-                    {fullName(employee)}
-                  </Link>
-                </TableCell>
-                <TableCell>{employee.position}</TableCell>
-              </TableRow>
-            ))}
-            {project.employees.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={2} align="center" sx={{ py: 4 }}>
-                  Nobody is assigned to this project yet.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      {form && <ProjectFormDialog project={form.entity} onClose={closeForm} />}
+
+      {pendingDelete && (
+        <ConfirmDeleteDialog
+          title="Delete project?"
+          description={`${pendingDelete.name} will be removed. Its employees stay in the company.`}
+          error={remove.error}
+          isPending={remove.isPending}
+          onCancel={cancelDelete}
+          onConfirm={() => remove.mutate(pendingDelete.id)}
+        />
+      )}
     </>
   );
 }

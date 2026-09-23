@@ -9,30 +9,49 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { Link as RouterLink, useParams } from "react-router";
+import { Link as RouterLink, useNavigate, useParams } from "react-router";
 
 import { industryLabel, projectStatusLabel } from "../api/choices";
-import { companyQuery } from "../api/companies";
+import { companyQuery, deleteCompany } from "../api/companies";
 import { employeeListQuery } from "../api/employees";
 import { projectListQuery } from "../api/projects";
+import { invalidateResources } from "../api/queryClient";
+import type { Company } from "../api/types";
+import { useAuth } from "../auth/AuthContext";
+import CompanyFormDialog from "../components/CompanyFormDialog";
+import ConfirmDeleteDialog from "../components/ConfirmDeleteDialog";
+import DetailActions from "../components/DetailActions";
 import ErrorState from "../components/ErrorState";
 import Field from "../components/Field";
 import Loading from "../components/Loading";
 import PageHeader from "../components/PageHeader";
+import { useCrudDialogs } from "../hooks/useCrudDialogs";
 import { EMPTY_VALUE, formatDate, fullName } from "../utils/format";
 
 const PREVIEW_SIZE = 5;
 
 export default function CompanyDetailPage() {
   const companyId = Number(useParams().companyId);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { form, pendingDelete, openEdit, closeForm, askDelete, cancelDelete } =
+    useCrudDialogs<Company>();
 
   const { data: company, isPending, error } = useQuery(companyQuery(companyId));
   const employees = useQuery(
     employeeListQuery({ company: companyId, page_size: PREVIEW_SIZE, ordering: "last_name" }),
   );
   const projects = useQuery(projectListQuery({ company: companyId, page_size: PREVIEW_SIZE }));
+
+  const remove = useMutation({
+    mutationFn: deleteCompany,
+    onSuccess: () => {
+      navigate("/companies", { replace: true });
+      invalidateResources();
+    },
+  });
 
   if (isPending) {
     return <Loading />;
@@ -43,7 +62,18 @@ export default function CompanyDetailPage() {
 
   return (
     <>
-      <PageHeader title={company.name} subtitle={industryLabel(company.industry)} />
+      <PageHeader
+        title={company.name}
+        subtitle={industryLabel(company.industry)}
+        action={
+          user && (
+            <DetailActions
+              onEdit={() => openEdit(company)}
+              onDelete={() => askDelete(company)}
+            />
+          )
+        }
+      />
 
       <Paper sx={{ p: 3, mb: 3 }}>
         <Stack spacing={2}>
@@ -118,6 +148,19 @@ export default function CompanyDetailPage() {
           </Section>
         </Grid>
       </Grid>
+
+      {form && <CompanyFormDialog company={form.entity} onClose={closeForm} />}
+
+      {pendingDelete && (
+        <ConfirmDeleteDialog
+          title="Delete company?"
+          description={`${pendingDelete.name}, its employees and its projects will be removed.`}
+          error={remove.error}
+          isPending={remove.isPending}
+          onCancel={cancelDelete}
+          onConfirm={() => remove.mutate(pendingDelete.id)}
+        />
+      )}
     </>
   );
 }

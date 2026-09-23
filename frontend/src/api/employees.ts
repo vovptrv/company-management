@@ -1,7 +1,13 @@
 import { keepPreviousData, queryOptions } from "@tanstack/react-query";
 
 import { apiClient } from "./client";
-import type { Employee, EmployeeDetail, EmployeeListParams, Paginated } from "./types";
+import type {
+  Employee,
+  EmployeeDetail,
+  EmployeeInput,
+  EmployeeListParams,
+  Paginated,
+} from "./types";
 
 const OPTIONS_PAGE_SIZE = 100;
 
@@ -32,3 +38,17 @@ export const employeeQuery = (id: number) =>
       return data;
     },
   });
+
+export async function createEmployee(input: EmployeeInput): Promise<Employee> {
+  const { data } = await apiClient.post<Employee>("/employees/", input);
+  return data;
+}
+
+export async function updateEmployee(id: number, input: EmployeeInput): Promise<Employee> {
+  const { data } = await apiClient.patch<Employee>(`/employees/${id}/`, input);
+  return data;
+}
+
+export async function deleteEmployee(id: number): Promise<void> {
+  await apiClient.delete(`/employees/${id}/`);
+}

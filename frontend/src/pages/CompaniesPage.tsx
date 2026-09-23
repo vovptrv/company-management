@@ -1,4 +1,6 @@
+import AddIcon from "@mui/icons-material/Add";
 import {
+  Button,
   Link,
   MenuItem,
   Paper,
@@ -11,23 +13,33 @@ import {
   TableRow,
   TextField,
 } from "@mui/material";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link as RouterLink } from "react-router";
 
 import { INDUSTRY_CHOICES, industryLabel } from "../api/choices";
 import { PAGE_SIZE } from "../api/client";
-import { companyListQuery } from "../api/companies";
+import { companyListQuery, deleteCompany } from "../api/companies";
+import { invalidateResources } from "../api/queryClient";
+import type { Company } from "../api/types";
+import { useAuth } from "../auth/AuthContext";
+import CompanyFormDialog from "../components/CompanyFormDialog";
+import ConfirmDeleteDialog from "../components/ConfirmDeleteDialog";
 import ErrorState from "../components/ErrorState";
 import ListPagination from "../components/ListPagination";
 import Loading from "../components/Loading";
 import PageHeader from "../components/PageHeader";
+import RowActions from "../components/RowActions";
 import SearchField from "../components/SearchField";
+import { useCrudDialogs } from "../hooks/useCrudDialogs";
 import { useListParams } from "../hooks/useListParams";
 import { EMPTY_VALUE } from "../utils/format";
 
 export default function CompaniesPage() {
   const { page, search, getParam, setParam, setPage } = useListParams();
   const industry = getParam("industry");
+  const { user } = useAuth();
+  const { form, pendingDelete, openCreate, openEdit, closeForm, askDelete, cancelDelete } =
+    useCrudDialogs<Company>();
 
   const { data, isPending, error } = useQuery(
     companyListQuery({
@@ -38,9 +50,27 @@ export default function CompaniesPage() {
     }),
   );
 
+  const remove = useMutation({
+    mutationFn: deleteCompany,
+    onSuccess: () => {
+      invalidateResources();
+      cancelDelete();
+    },
+  });
+
   return (
     <>
-      <PageHeader title="Companies" subtitle={data && `${data.count} total`} />
+      <PageHeader
+        title="Companies"
+        subtitle={data && `${data.count} total`}
+        action={
+          user && (
+            <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
+              New company
+            </Button>
+          )
+        }
+      />
 
       <Stack direction="row" spacing={2} sx={{ mb: 3, flexWrap: "wrap" }}>
         <SearchField
@@ -78,6 +108,7 @@ export default function CompaniesPage() {
                   <TableCell>Industry</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Website</TableCell>
+                  {user && <TableCell />}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -99,11 +130,20 @@ export default function CompaniesPage() {
                         EMPTY_VALUE
                       )}
                     </TableCell>
+                    {user && (
+                      <TableCell align="right" sx={{ py: 0 }}>
+                        <RowActions
+                          label={company.name}
+                          onEdit={() => openEdit(company)}
+                          onDelete={() => askDelete(company)}
+                        />
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
                 {data.results.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={user ? 5 : 4} align="center" sx={{ py: 4 }}>
                       No companies match the current filters.
                     </TableCell>
                   </TableRow>
@@ -119,6 +159,19 @@ export default function CompaniesPage() {
             onChange={setPage}
           />
         </>
+      )}
+
+      {form && <CompanyFormDialog company={form.entity} onClose={closeForm} />}
+
+      {pendingDelete && (
+        <ConfirmDeleteDialog
+          title="Delete company?"
+          description={`${pendingDelete.name}, its employees and its projects will be removed.`}
+          error={remove.error}
+          isPending={remove.isPending}
+          onCancel={cancelDelete}
+          onConfirm={() => remove.mutate(pendingDelete.id)}
+        />
       )}
     </>
   );

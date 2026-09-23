@@ -12,3 +12,11 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+/**
+ * The three resources quote each other and a deleted company takes its
+ * employees and projects with it, so any write can change any list.
+ */
+export function invalidateResources() {
+  return queryClient.invalidateQueries();
+}

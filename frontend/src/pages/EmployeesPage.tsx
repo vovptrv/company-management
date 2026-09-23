@@ -1,4 +1,6 @@
+import AddIcon from "@mui/icons-material/Add";
 import {
+  Button,
   Link,
   Paper,
   Stack,
@@ -9,23 +11,33 @@ import {
   TableHead,
   TableRow,
 } from "@mui/material";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link as RouterLink } from "react-router";
 
 import { PAGE_SIZE } from "../api/client";
-import { employeeListQuery } from "../api/employees";
+import { deleteEmployee, employeeListQuery } from "../api/employees";
+import { invalidateResources } from "../api/queryClient";
+import type { Employee } from "../api/types";
+import { useAuth } from "../auth/AuthContext";
 import CompanyFilter from "../components/CompanyFilter";
+import ConfirmDeleteDialog from "../components/ConfirmDeleteDialog";
+import EmployeeFormDialog from "../components/EmployeeFormDialog";
 import ErrorState from "../components/ErrorState";
 import ListPagination from "../components/ListPagination";
 import Loading from "../components/Loading";
 import PageHeader from "../components/PageHeader";
+import RowActions from "../components/RowActions";
 import SearchField from "../components/SearchField";
+import { useCrudDialogs } from "../hooks/useCrudDialogs";
 import { useListParams } from "../hooks/useListParams";
 import { formatDate, fullName } from "../utils/format";
 
 export default function EmployeesPage() {
   const { page, search, getParam, setParam, setPage } = useListParams();
   const company = getParam("company");
+  const { user } = useAuth();
+  const { form, pendingDelete, openCreate, openEdit, closeForm, askDelete, cancelDelete } =
+    useCrudDialogs<Employee>();
 
   const { data, isPending, error } = useQuery(
     employeeListQuery({
@@ -36,9 +48,27 @@ export default function EmployeesPage() {
     }),
   );
 
+  const remove = useMutation({
+    mutationFn: deleteEmployee,
+    onSuccess: () => {
+      invalidateResources();
+      cancelDelete();
+    },
+  });
+
   return (
     <>
-      <PageHeader title="Employees" subtitle={data && `${data.count} total`} />
+      <PageHeader
+        title="Employees"
+        subtitle={data && `${data.count} total`}
+        action={
+          user && (
+            <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
+              New employee
+            </Button>
+          )
+        }
+      />
 
       <Stack direction="row" spacing={2} sx={{ mb: 3, flexWrap: "wrap" }}>
         <SearchField
@@ -64,6 +94,7 @@ export default function EmployeesPage() {
                   <TableCell>Email</TableCell>
                   <TableCell>Hired</TableCell>
                   <TableCell align="right">Projects</TableCell>
+                  {user && <TableCell />}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -83,11 +114,20 @@ export default function EmployeesPage() {
                     <TableCell>{employee.email}</TableCell>
                     <TableCell>{formatDate(employee.hire_date)}</TableCell>
                     <TableCell align="right">{employee.projects.length}</TableCell>
+                    {user && (
+                      <TableCell align="right" sx={{ py: 0 }}>
+                        <RowActions
+                          label={fullName(employee)}
+                          onEdit={() => openEdit(employee)}
+                          onDelete={() => askDelete(employee)}
+                        />
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
                 {data.results.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={user ? 7 : 6} align="center" sx={{ py: 4 }}>
                       No employees match the current filters.
                     </TableCell>
                   </TableRow>
@@ -103,6 +143,19 @@ export default function EmployeesPage() {
             onChange={setPage}
           />
         </>
+      )}
+
+      {form && <EmployeeFormDialog employee={form.entity} onClose={closeForm} />}
+
+      {pendingDelete && (
+        <ConfirmDeleteDialog
+          title="Delete employee?"
+          description={`${fullName(pendingDelete)} will be removed from the company and from every project.`}
+          error={remove.error}
+          isPending={remove.isPending}
+          onCancel={cancelDelete}
+          onConfirm={() => remove.mutate(pendingDelete.id)}
+        />
       )}
     </>
   );

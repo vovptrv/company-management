@@ -1,7 +1,7 @@
 import { keepPreviousData, queryOptions } from "@tanstack/react-query";
 
 import { apiClient } from "./client";
-import type { Company, CompanyListParams, Paginated } from "./types";
+import type { Company, CompanyInput, CompanyListParams, Paginated } from "./types";
 
 // Every company at once, for the dropdowns that must offer all of them.
 const OPTIONS_PAGE_SIZE = 100;
@@ -34,3 +34,17 @@ export const companyQuery = (id: number) =>
       return data;
     },
   });
+
+export async function createCompany(input: CompanyInput): Promise<Company> {
+  const { data } = await apiClient.post<Company>("/companies/", input);
+  return data;
+}
+
+export async function updateCompany(id: number, input: CompanyInput): Promise<Company> {
+  const { data } = await apiClient.patch<Company>(`/companies/${id}/`, input);
+  return data;
+}
+
+export async function deleteCompany(id: number): Promise<void> {
+  await apiClient.delete(`/companies/${id}/`);
+}

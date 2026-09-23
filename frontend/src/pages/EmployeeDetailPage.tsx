@@ -7,21 +7,40 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useQuery } from "@tanstack/react-query";
-import { Link as RouterLink, useParams } from "react-router";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Link as RouterLink, useNavigate, useParams } from "react-router";
 
-import { employeeQuery } from "../api/employees";
+import { deleteEmployee, employeeQuery } from "../api/employees";
+import { invalidateResources } from "../api/queryClient";
+import type { EmployeeDetail } from "../api/types";
+import { useAuth } from "../auth/AuthContext";
+import ConfirmDeleteDialog from "../components/ConfirmDeleteDialog";
+import DetailActions from "../components/DetailActions";
+import EmployeeFormDialog from "../components/EmployeeFormDialog";
 import ErrorState from "../components/ErrorState";
 import Field from "../components/Field";
 import Loading from "../components/Loading";
 import PageHeader from "../components/PageHeader";
 import StatusChip from "../components/StatusChip";
+import { useCrudDialogs } from "../hooks/useCrudDialogs";
 import { formatDate, fullName } from "../utils/format";
 
 export default function EmployeeDetailPage() {
   const employeeId = Number(useParams().employeeId);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { form, pendingDelete, openEdit, closeForm, askDelete, cancelDelete } =
+    useCrudDialogs<EmployeeDetail>();
 
   const { data: employee, isPending, error } = useQuery(employeeQuery(employeeId));
+
+  const remove = useMutation({
+    mutationFn: deleteEmployee,
+    onSuccess: () => {
+      navigate("/employees", { replace: true });
+      invalidateResources();
+    },
+  });
 
   if (isPending) {
     return <Loading />;
@@ -32,7 +51,18 @@ export default function EmployeeDetailPage() {
 
   return (
     <>
-      <PageHeader title={fullName(employee)} subtitle={employee.position} />
+      <PageHeader
+        title={fullName(employee)}
+        subtitle={employee.position}
+        action={
+          user && (
+            <DetailActions
+              onEdit={() => openEdit(employee)}
+              onDelete={() => askDelete(employee)}
+            />
+          )
+        }
+      />
 
       <Paper sx={{ p: 3, mb: 3 }}>
         <Stack direction="row" spacing={6} sx={{ flexWrap: "wrap", rowGap: 2 }}>
@@ -77,6 +107,19 @@ export default function EmployeeDetailPage() {
           </List>
         )}
       </Paper>
+
+      {form && <EmployeeFormDialog employee={form.entity} onClose={closeForm} />}
+
+      {pendingDelete && (
+        <ConfirmDeleteDialog
+          title="Delete employee?"
+          description={`${fullName(pendingDelete)} will be removed from the company and from every project.`}
+          error={remove.error}
+          isPending={remove.isPending}
+          onCancel={cancelDelete}
+          onConfirm={() => remove.mutate(pendingDelete.id)}
+        />
+      )}
     </>
   );
 }
