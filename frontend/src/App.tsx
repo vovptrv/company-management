@@ -5,6 +5,7 @@ import CompaniesPage from "./pages/CompaniesPage";
 import CompanyDetailPage from "./pages/CompanyDetailPage";
 import EmployeeDetailPage from "./pages/EmployeeDetailPage";
 import EmployeesPage from "./pages/EmployeesPage";
+import LoginPage from "./pages/LoginPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import ProjectDetailPage from "./pages/ProjectDetailPage";
 import ProjectsPage from "./pages/ProjectsPage";
@@ -14,6 +15,7 @@ export default function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<Navigate to="/companies" replace />} />
+        <Route path="login" element={<LoginPage />} />
         <Route path="companies" element={<CompaniesPage />} />
         <Route path="companies/:companyId" element={<CompanyDetailPage />} />
         <Route path="employees" element={<EmployeesPage />} />

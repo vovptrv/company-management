@@ -6,6 +6,7 @@ import { BrowserRouter } from "react-router";
 
 import { queryClient } from "./api/queryClient";
 import App from "./App";
+import { AuthProvider } from "./auth/AuthContext";
 import { theme } from "./theme";
 
 createRoot(document.getElementById("root")!).render(
@@ -13,9 +14,11 @@ createRoot(document.getElementById("root")!).render(
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
+        <AuthProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>
   </StrictMode>,

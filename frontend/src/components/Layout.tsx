@@ -1,5 +1,8 @@
-import { AppBar, Box, Button, Container, Toolbar, Typography } from "@mui/material";
-import { Link, NavLink, Outlet } from "react-router";
+import LogoutIcon from "@mui/icons-material/Logout";
+import { AppBar, Box, Button, Container, Stack, Toolbar, Typography } from "@mui/material";
+import { Link, NavLink, Outlet, useLocation } from "react-router";
+
+import { useAuth } from "../auth/AuthContext";
 
 const NAV_ITEMS = [
   { label: "Companies", path: "/companies" },
@@ -8,6 +11,9 @@ const NAV_ITEMS = [
 ];
 
 export default function Layout() {
+  const { user, isLoading, signOut } = useAuth();
+  const location = useLocation();
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       <AppBar position="sticky">
@@ -34,6 +40,27 @@ export default function Layout() {
               </Button>
             ))}
           </Box>
+
+          <Box sx={{ flexGrow: 1 }} />
+
+          {!isLoading &&
+            (user ? (
+              <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+                <Typography variant="body2">{user.email}</Typography>
+                <Button color="inherit" startIcon={<LogoutIcon />} onClick={signOut}>
+                  Sign out
+                </Button>
+              </Stack>
+            ) : (
+              <Button
+                color="inherit"
+                component={Link}
+                to="/login"
+                state={{ from: location.pathname + location.search }}
+              >
+                Sign in
+              </Button>
+            ))}
         </Toolbar>
       </AppBar>
 
