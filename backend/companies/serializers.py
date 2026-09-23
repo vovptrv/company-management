@@ -184,3 +184,17 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 class ProjectDetailSerializer(ProjectSerializer):
     employees = ProjectEmployeeSerializer(many=True, read_only=True)
+
+
+class ProjectMemberSerializer(serializers.Serializer):
+    employee = serializers.PrimaryKeyRelatedField(queryset=Employee.objects.all())
+
+    def validate_employee(self, employee: Employee) -> Employee:
+        if employee.company_id != self.context["project"].company_id:
+            raise serializers.ValidationError("Employee works in another company.")
+        return employee
+
+    def create(self, validated_data: dict) -> Project:
+        project = self.context["project"]
+        project.employees.add(validated_data["employee"])
+        return project
